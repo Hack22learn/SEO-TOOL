@@ -1,11 +1,49 @@
 # Extract All links of A website
 
 import anydbm
+import urllib2
+import time
 
 class database(object):
     def __init__(self):
+        self.to_crawl = anydbm.open('Tocrawl.db', 'c')
+        self.crawled = anydbm.open('crawled.db','c')
+        self.len_crawled = 0
+        self.len_to_crawl = 0
+    
+    def union(self,urls):
+        #Take Union of new URLS found with to_crawl
+        for url in urls:
+            if url not in self.to_crawl:
+                self.to_crawl[url]='?'
+        self.len_to_crawl=len(self.to_crawl)
+    
+    def Update_crawled(self,url):
+        #add url to crawled list
+        self.crawled[url]='@'
+        self.len_crawled +=1
+
+    def next_link_2_crawl(self):
+        # get a link from to_crawl 
+        # return link and delete that key from to_crawl
+        key=self.to_crawl.keys()[0] #get a key from to crawl
+        del self.to_crawl[key] #delete that key from to_crawl
+        self.len_to_crawl -=1 #decrement length of to crawl 
+        return key
         
-        
+    def create_XML(self):
+        # create XML file on basis of link in crawled
+        f=open('sitemap.xml','w')
+        for key in self.to_crawl:
+            f.write(key+'\n')
+        f.close()
+    
+    def close(self):
+        #close all database and file
+        self.to_crawl.close()
+        self.crawled.close()
+
+
 def find_main_domain(url):
     #This function use to exract main Body of URL
     #Example :> http://beginer2cs.blogspot.com  >>beginer2cs
@@ -134,11 +172,29 @@ def connect_to_link(link):
 
 
 if __name__ == '__main__':
-    while True:
-        first_link=raw_input("Enter Your Website URL \n Example : www.beginer2cs.blogspot.com \n:> ")
+    first_link=raw_input("Enter Your Website URL \n Example : www.beginer2cs.blogspot.com \n:> ")
         
+    ##TIme Stamp
+    start_time=time.clock()
+    count=0
+    ##########################
+    sitemap=database() #create Object
+    sitemap.union([first_link]) #add base url to to_crawl
+    #Start Crawl
+    while sitemap.len_to_crawl >0:
+        url=sitemap.next_link_2_crawl() #get Next link to crawl
         domain=find_main_domain(first_link)
-        if domain!=False:
-            break
-    print domain
-    raw_input()
+        if domain !=False:
+            page_data=connect_to_link(url)
+            if page_data !=False:
+                urls=collect_all_link(page_data,url,domain)
+                sitemap.union(urls)
+                sitemap.Update_crawled(url)
+        ##Time Stamp Print
+        count +=1
+        if count==20:
+            print time.clock-start_time(),'Sec\npage crawled->',sitemap.len_crawled,'\n page to crawl ->',sitemap.len_to_crawl
+            count=0
+    sitemap.create_XML()
+    sitemap.close()
+    raw_input('END')
